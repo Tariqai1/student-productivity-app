@@ -54,9 +54,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # CORS CONFIGURATION
 # ===============================
 origins = [
-    "http://localhost:5173",    # React Frontend
-    "http://127.0.0.1:5173",
-    "http://localhost:3000",
+    "http://localhost:5173",
+    "https://student-productivity-app-brown.vercel.app" # 👈 Apna naya Vercel link yahan paste karein
 ]
 
 app.add_middleware(
