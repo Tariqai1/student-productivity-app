@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Base URL set karein
 const api = axios.create({
-  baseURL: 'http://127.0.0.1:8000/api/v1', // Apna backend URL check karein
+  baseURL: 'https://student-productivity-app-lzvy.onrender.com', // Apna backend URL check karein
   headers: {
     'Content-Type': 'application/json',
   },
