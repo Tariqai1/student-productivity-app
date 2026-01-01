@@ -41,7 +41,7 @@ const DashboardUI = ({
   );
 
   return (
-    <div className="space-y-8 pb-10 relative">
+    <div className="space-y-8 pb-10 relative max-w-6xl mx-auto">
       
       {/* 📝 REMARK MODAL */}
       {isRemarkModalOpen && (
@@ -73,7 +73,7 @@ const DashboardUI = ({
 
       {/* 1. Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
+        <div className="ml-8 md:ml-0">
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Dashboard</h1>
           <p className="text-gray-500 mt-1">
             Welcome back, <span className="font-semibold text-indigo-600">{user?.full_name}</span>!
