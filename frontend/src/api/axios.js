@@ -21,7 +21,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 15000, // 15 seconds ka timeout (Render free tier slow hota hai isliye)
+  timeout: 60000, // 15 seconds ka timeout (Render free tier slow hota hai isliye)
 });
 
 // ----------------------------------------------------------------------
