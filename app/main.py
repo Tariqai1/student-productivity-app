@@ -55,7 +55,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # ===============================
 origins = [
     "http://localhost:5173",
-    "https://student-productivity-app-brown.vercel.app" # 👈 Apna naya Vercel link yahan paste karein
+    "student-productivity-app-brown.vercel.app" # 👈 Apna naya Vercel link yahan paste karein
 ]
 
 app.add_middleware(
