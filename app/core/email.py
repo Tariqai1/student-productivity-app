@@ -1,80 +1,61 @@
-import smtplib
-import ssl
-import socket  # 👈 Zaroori import
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import requests
 from app.core.config import settings
-
-# ==========================================
-# 🛑 IPv4 FORCE HACK
-# ==========================================
-# Render kabhi-kabhi IPv6 use karta hai jo Gmail block kar deta hai.
-# Ye code zabardasti IPv4 use karega.
-orig_getaddrinfo = socket.getaddrinfo
-
-def getaddrinfo_ipv4(host, port, family=0, type=0, proto=0, flags=0):
-    if family == 0:
-        family = socket.AF_INET # Force IPv4
-    return orig_getaddrinfo(host, port, family, type, proto, flags)
-
-socket.getaddrinfo = getaddrinfo_ipv4
-# ==========================================
 
 async def send_email(email_to: str, subject: str, html_content: str):
     """
-    Sends email using SMTP_SSL (Port 465) with Forced IPv4.
+    Sends email using Brevo (Sendinblue) API via HTTP Request.
+    This bypasses Port 587/465 blocking on Render.
     """
+    url = "https://api.brevo.com/v3/smtp/email"
+    
+    headers = {
+        "accept": "application/json",
+        "api-key": settings.EMAIL_API_KEY, # Config se key uthayega
+        "content-type": "application/json"
+    }
+    
+    payload = {
+        "sender": {"email": settings.EMAIL_SENDER, "name": "Student App"},
+        "to": [{"email": email_to}],
+        "subject": subject,
+        "htmlContent": html_content
+    }
+
     try:
-        # Debug Print
-        print(f"📧 [Email System] Connecting to {settings.EMAIL_HOST}:465 (Forced IPv4)...")
+        print(f"🚀 [Brevo API] Sending email to {email_to}...")
         
-        # 1. Setup Message
-        message = MIMEMultipart("alternative")
-        message["Subject"] = subject
-        message["From"] = settings.EMAIL_SENDER
-        message["To"] = email_to
-
-        # 2. Add HTML Body
-        part = MIMEText(html_content, "html")
-        message.attach(part)
-
-        # 3. SSL Context
-        context = ssl.create_default_context()
-
-        # 4. Connect (Hardcoded Port 465 for Stability)
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
-            server.login(settings.EMAIL_SENDER, settings.EMAIL_PASSWORD)
-            server.sendmail(
-                settings.EMAIL_SENDER, email_to, message.as_string()
-            )
+        # Ye normal website request ki tarah jata hai (Port 443)
+        # Isliye Render isse block nahi karega
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
         
-        print(f"✅ Email sent successfully to {email_to}")
-        return True
+        if response.status_code in [200, 201, 202]:
+            print(f"✅ Email sent successfully! Message ID: {response.json().get('messageId')}")
+            return True
+        else:
+            print(f"❌ [Brevo Failed] Status: {response.status_code}, Error: {response.text}")
+            return False
 
     except Exception as e:
-        print(f"❌ [Email Failed] Error: {e}")
+        print(f"❌ [API Error] Failed to connect: {e}")
         return False
 
 # ==========================================
 # 1. FORGOT PASSWORD EMAIL
 # ==========================================
 async def send_reset_password_email(email_to: str, token: str):
+    # Apna Vercel Link yahan dalein
     base_url = "https://student-productivity-app-brown.vercel.app" 
     reset_link = f"{base_url}/reset-password?token={token}"
 
-    subject = "Reset Your Password - StudentApp"
+    subject = "Reset Your Password"
     
     html_content = f"""
     <html>
-        <body style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-            <div style="max-width: 500px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 10px;">
-                <h2 style="color: #4f46e5; text-align: center;">Password Reset Request</h2>
-                <p>Hello,</p>
-                <p>Click below to reset your password:</p>
-                <div style="text-align: center; margin: 30px 0;">
-                    <a href="{reset_link}" style="background-color: #4f46e5; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">Reset Password</a>
-                </div>
-            </div>
+        <body style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2>Password Reset Request</h2>
+            <p>Click the button below to reset your password:</p>
+            <a href="{reset_link}" style="background-color: #4f46e5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a>
+            <p>Ignore if you didn't request this.</p>
         </body>
     </html>
     """
@@ -85,7 +66,5 @@ async def send_reset_password_email(email_to: str, token: str):
 # ==========================================
 async def send_checkout_reminder(email_to: str, name: str):
     subject = "⚠️ Action Required: You forgot to Checkout!"
-    html_content = f"""
-    <html><body><p>Hi {name}, please checkout.</p></body></html>
-    """
+    html_content = f"<p>Hi {name}, please checkout from your dashboard.</p>"
     return await send_email(email_to, subject, html_content)
