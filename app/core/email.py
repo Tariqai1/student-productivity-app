@@ -6,7 +6,7 @@ from app.core.config import settings
 
 async def send_email(email_to: str, subject: str, html_content: str):
     """
-    Generic function to send emails using SMTP (Gmail).
+    Generic function to send emails using SMTP_SSL (Gmail Port 465).
     """
     try:
         # 1. Setup Message
@@ -22,9 +22,9 @@ async def send_email(email_to: str, subject: str, html_content: str):
         # 3. Create Secure SSL Context
         context = ssl.create_default_context()
 
-        # 4. Connect to Server & Send
-        with smtplib.SMTP(settings.EMAIL_HOST, settings.EMAIL_PORT) as server:
-            server.starttls(context=context) # Secure the connection
+        # 4. Connect to Server & Send (Using SMTP_SSL for Port 465)
+        # 👇 CHANGE: SMTP_SSL use kar rahe hain jo seedha connect hota hai
+        with smtplib.SMTP_SSL(settings.EMAIL_HOST, settings.EMAIL_PORT, context=context) as server:
             server.login(settings.EMAIL_SENDER, settings.EMAIL_PASSWORD)
             server.sendmail(
                 settings.EMAIL_SENDER, email_to, message.as_string()
@@ -44,8 +44,9 @@ async def send_reset_password_email(email_to: str, token: str):
     """
     Sends the specific 'Reset Password' email with the link.
     """
-    # 🔗 Frontend Reset Link (Make sure port matches your React App)
-    reset_link = f"http://localhost:5173/reset-password?token={token}"
+    # 🔗 Frontend Reset Link (Make sure this matches your deployed domain)
+    # Testing ke liye localhost, Production ke liye Vercel link use karein
+    reset_link = f"https://student-productivity-app-brown.vercel.app/reset-password?token={token}"
 
     subject = "Reset Your Password - StudentApp"
     
@@ -89,7 +90,7 @@ async def send_checkout_reminder(email_to: str, name: str):
                 <p>It seems you forgot to mark your <strong>Check-Out</strong> for today's session.</p>
                 <p>Please login to your dashboard and close your session to maintain your attendance record.</p>
                 <br>
-                <a href="http://localhost:5173/login" style="color: #b91c1c; font-weight: bold;">Go to Dashboard &rarr;</a>
+                <a href="https://student-productivity-app-brown.vercel.app/login" style="color: #b91c1c; font-weight: bold;">Go to Dashboard &rarr;</a>
             </div>
         </body>
     </html>
