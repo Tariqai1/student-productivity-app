@@ -91,17 +91,18 @@ async def register(student: StudentRegister):
     return {"message": "Student registered successfully"}
 
 # ==========================================
-# 3. FORGOT PASSWORD (Link Based)
+3. FORGOT PASSWORD (Link Based)
 # ==========================================
 @router.post("/forgot-password")
-async def forgot_password(
-    request: ForgotPasswordRequest, 
-    background_tasks: BackgroundTasks
-):
+async def forgot_password(request: ForgotPasswordRequest): 
+    # ⚠️ Maine 'BackgroundTasks' hata diya hai taaki hum wait karein result ka
+    
     db = get_database()
     user = await db["students"].find_one({"email": request.email})
     
     if not user:
+        # Security: Fake success message taaki hacker ko pata na chale email exist karta hai ya nahi
+        # Lekin development mein aap isse comment out karke check kar sakte hain
         return {"message": "If this email is registered, you will receive a reset link."}
 
     token = str(uuid.uuid4())
@@ -114,10 +115,16 @@ async def forgot_password(
     }
     
     await db["password_resets"].insert_one(reset_entry)
-    background_tasks.add_task(send_reset_password_email, request.email, token)
+    
+    # ✅ FIX: Ab hum 'await' kar rahe hain. 
+    # Agar email fail hua, to ye function False return karega.
+    email_sent = await send_reset_password_email(request.email, token)
+    
+    if not email_sent:
+        # Ab Frontend par Red Error aayega agar email nahi gaya
+        raise HTTPException(status_code=500, detail="Failed to send email. Check Server Logs.")
     
     return {"message": "Password reset link sent to your email."}
-
 # ==========================================
 # 4. RESET PASSWORD
 # ==========================================
