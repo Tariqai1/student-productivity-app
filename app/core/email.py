@@ -1,50 +1,46 @@
-import smtplib
-import ssl
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
 from app.core.config import settings
+from pydantic import EmailStr
+from typing import List
+
+# 1. Connection Configuration
+conf = ConnectionConfig(
+    MAIL_USERNAME=settings.EMAIL_SENDER,
+    MAIL_PASSWORD=settings.EMAIL_PASSWORD,
+    MAIL_FROM=settings.EMAIL_SENDER,
+    MAIL_PORT=settings.EMAIL_PORT,
+    MAIL_SERVER=settings.EMAIL_HOST,
+    
+    # SSL Settings for Port 465 (Isse Network Unreachable Error fix hoga)
+    MAIL_STARTTLS=False,
+    MAIL_SSL_TLS=True,
+    
+    USE_CREDENTIALS=True,
+    VALIDATE_CERTS=True
+)
 
 async def send_email(email_to: str, subject: str, html_content: str):
     """
-    Generic function to send emails using SMTP_SSL (Gmail Port 465).
+    Sends email using fastapi-mail wrapper.
     """
     try:
-        # 🔍 DEBUG PRINTS (Logs mein check karna)
-        print(f"📧 [Email Debug] Connecting to: {settings.EMAIL_HOST}:{settings.EMAIL_PORT}")
-        print(f"📧 [Email Debug] Sender: {settings.EMAIL_SENDER}")
+        print(f"📧 [Email Debug] Sending to {email_to} via {settings.EMAIL_HOST}:{settings.EMAIL_PORT}")
         
-        # 1. Setup Message
-        message = MIMEMultipart("alternative")
-        message["Subject"] = subject
-        message["From"] = settings.EMAIL_SENDER
-        message["To"] = email_to
+        message = MessageSchema(
+            subject=subject,
+            recipients=[email_to],
+            body=html_content,
+            subtype=MessageType.html
+        )
 
-        # 2. Add HTML Body
-        part = MIMEText(html_content, "html")
-        message.attach(part)
-
-        # 3. Create Secure SSL Context
-        context = ssl.create_default_context()
-
-        # 4. Connect to Server & Send
-        # SMTP_SSL hi use karein (Port 465 ke liye)
-        with smtplib.SMTP_SSL(settings.EMAIL_HOST, settings.EMAIL_PORT, context=context) as server:
-            print("📧 [Email Debug] Login attempting...")
-            server.login(settings.EMAIL_SENDER, settings.EMAIL_PASSWORD)
-            print("📧 [Email Debug] Login Success! Sending mail...")
-            
-            server.sendmail(
-                settings.EMAIL_SENDER, email_to, message.as_string()
-            )
+        fm = FastMail(conf)
+        await fm.send_message(message)
         
         print(f"✅ Email sent successfully to {email_to}")
         return True
 
     except Exception as e:
-        # Ye error Render ke logs mein dikhega
         print(f"❌ [Email Failed] Error: {e}")
-        # Agar ye print hua: '[Errno 101] Network is unreachable', 
-        # iska matlab abhi bhi PORT 587 use ho raha hai (Render Env Var check karein).
         return False
 
 # ==========================================
@@ -70,6 +66,8 @@ async def send_reset_password_email(email_to: str, token: str):
                 </div>
                 
                 <p style="font-size: 12px; color: #777;">If you did not request this, please ignore this email. The link will expire in 30 minutes.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                <p style="text-align: center; font-size: 12px; color: #999;">Student Productivity App</p>
             </div>
         </body>
     </html>
