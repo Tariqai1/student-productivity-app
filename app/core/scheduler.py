@@ -42,8 +42,9 @@ async def notify_late_students():
         try:
             student = await db["students"].find_one({"_id": ObjectId(student_id)})
             if student and student.get("email"):
+                # ✅ FIX: 'email' ko badal kar 'email_to' kiya hai
                 await send_checkout_reminder(
-                    email=student["email"],
+                    email_to=student["email"], 
                     name=student["full_name"]
                 )
                 print(f"   📧 Warning sent to: {student['full_name']}")
@@ -76,7 +77,7 @@ async def auto_close_sessions():
                 "status": "Forgot Checkout",  # 👈 Key for Yellow Color in Calendar
                 "check_out_time": now_ist,    # Mark current time
                 "tasks": "System Auto-Close: Student forgot to checkout.",
-                "duration_hours": 0           # Penalty: 0 Productivity Hours
+                "duration_hours": 1           # Penalty: 0 Productivity Hours
             }
         }
     )
