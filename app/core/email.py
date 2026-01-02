@@ -7,7 +7,7 @@ from app.core.config import settings
 async def send_email(email_to: str, subject: str, html_content: str):
     """
     Generic function to send emails using SMTP_SSL (Gmail Port 465).
-    This is required for Render/Cloud servers.
+    Works on Localhost AND Render Cloud.
     """
     try:
         # 1. Setup Message
@@ -24,8 +24,8 @@ async def send_email(email_to: str, subject: str, html_content: str):
         context = ssl.create_default_context()
 
         # 4. Connect to Server & Send
-        # 👇 CHANGE: Use SMTP_SSL instead of SMTP
-        # 👇 CHANGE: Remove server.starttls() (Not needed for SSL)
+        # ✅ FIX: SMTP_SSL use kar rahe hain (Port 465 ke liye zaroori)
+        # ✅ NOTE: 'server.starttls()' hata diya gaya hai kyunki SSL pehle se secure hai.
         with smtplib.SMTP_SSL(settings.EMAIL_HOST, settings.EMAIL_PORT, context=context) as server:
             server.login(settings.EMAIL_SENDER, settings.EMAIL_PASSWORD)
             server.sendmail(
@@ -46,10 +46,10 @@ async def send_reset_password_email(email_to: str, token: str):
     """
     Sends the specific 'Reset Password' email with the link.
     """
-    # 🔗 Frontend Reset Link
-    # IMPORTANT: When deploying to Render, change localhost to your Vercel URL
-    # Example: https://your-app.vercel.app/reset-password?token={token}
-    reset_link = f"https://student-productivity-app-brown.vercel.app/reset-password?token={token}"
+    # 🔗 Frontend Link (Apka Vercel URL)
+    base_url = "https://student-productivity-app-brown.vercel.app" 
+    
+    reset_link = f"{base_url}/reset-password?token={token}"
 
     subject = "Reset Your Password - StudentApp"
     
@@ -76,7 +76,7 @@ async def send_reset_password_email(email_to: str, token: str):
     return await send_email(email_to, subject, html_content)
 
 # ==========================================
-# 2. CHECKOUT REMINDER EMAIL (For Scheduler)
+# 2. CHECKOUT REMINDER EMAIL
 # ==========================================
 async def send_checkout_reminder(email_to: str, name: str):
     """
