@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.core.database import get_database
 from app.core.deps import get_current_user
 from datetime import datetime, timedelta
-import pytz # 👈 Timezone ke liye zaroori
+import pytz 
 from bson import ObjectId
 
 router = APIRouter()
@@ -17,7 +17,7 @@ def verify_admin(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Not authorized.")
     return current_user
 
-# 🛠 INTERNAL HELPER: Safe Date Parser
+# 🛠 INTERNAL HELPER: Safe Date Parser (Strictly converts to IST)
 def parse_to_ist(date_val):
     """
     Converts String, UTC Datetime, or Naive Datetime -> IST Datetime
@@ -28,10 +28,9 @@ def parse_to_ist(date_val):
     try:
         # 1. Agar String hai, to Datetime banao
         if isinstance(date_val, str):
-            # "Z" hata kar simple parsing
             date_val = datetime.fromisoformat(date_val.replace("Z", "+00:00"))
         
-        # 2. Agar Naive hai (bina timezone), to UTC maano
+        # 2. Agar Naive hai (bina timezone), to UTC maano (Render server UTC deta hai)
         if date_val.tzinfo is None:
             date_val = pytz.utc.localize(date_val)
             
@@ -46,13 +45,14 @@ async def calculate_productivity(db, student_id: str):
     now_utc = datetime.utcnow().replace(tzinfo=pytz.utc)
     now_ist = now_utc.astimezone(IST)
     
-    # 1. Define Time Ranges (Monday Start)
+    # 1. Define Time Ranges (Based on IST Midnight)
     start_of_day = now_ist.replace(hour=0, minute=0, second=0, microsecond=0)
     
-    start_of_week = now_ist - timedelta(days=now_ist.weekday())
-    start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+    # Start of week (Monday)
+    start_of_week = start_of_day - timedelta(days=start_of_day.weekday())
     
-    start_of_month = now_ist.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    # Start of month
+    start_of_month = start_of_day.replace(day=1)
 
     # 2. Fetch All Logs
     logs = await db["attendance"].find({"student_id": student_id}).to_list(length=2000)
@@ -62,7 +62,8 @@ async def calculate_productivity(db, student_id: str):
         "today": {"hours": 0, "status": "Absent"},
         "week": {"hours": 0, "days_present": 0},
         "month": {"hours": 0, "days_present": 0},
-        "all_time": {"total_hours": 0, "total_days": 0}
+        "all_time": {"total_hours": 0, "total_days": 0},
+        "lifetime": {"hours": 0, "sessions": len(logs)} # Profile page support
     }
     
     unique_days_week = set()
@@ -71,11 +72,12 @@ async def calculate_productivity(db, student_id: str):
 
     for log in logs:
         # Step A: Parse Dates to IST
+        # Check-in time DB se aata hai, usse IST mein convert karna zaroori hai
         check_in = parse_to_ist(log.get("check_in_time") or log.get("date"))
         check_out = parse_to_ist(log.get("check_out_time"))
 
         if not check_in:
-            continue # Skip invalid logs
+            continue 
 
         # Step B: Calculate Duration (Hours)
         duration = 0
@@ -85,31 +87,31 @@ async def calculate_productivity(db, student_id: str):
             # Case 1: Session Completed
             diff_seconds = (check_out - check_in).total_seconds()
         else:
-            # Case 2: Session Active (Check if it started today)
-            # Agar session aaj start hua hai tabhi active mano, warna ignore karo
+            # Case 2: Session Active 
+            # Agar session aaj (IST Date) start hua hai tabhi active mano
             if check_in.date() == now_ist.date():
                 diff_seconds = (now_ist - check_in).total_seconds()
                 is_active_now = True
             else:
-                diff_seconds = 0 # Purana open session ignore karo (Huge number fix)
+                diff_seconds = 0 
 
-        # Step C: Sanity Checks (Garbage Data Filter)
-        # 1. Negative nahi hona chahiye
-        # 2. 18 Ghante (64800 seconds) se zyada nahi hona chahiye (Forgot logout case)
+        # Step C: Sanity Checks 
         if 0 < diff_seconds < 65000:
             duration = round(diff_seconds / 3600, 2)
         else:
-            duration = 0 # Bad data treat karke 0 kar do
+            duration = 0
 
         # Step D: Aggregate Data
-        log_date = check_in # Use Check-in time for grouping
+        log_date = check_in 
         
         # Add to All Time
         stats["all_time"]["total_hours"] += duration
+        stats["lifetime"]["hours"] += duration
+        
         if duration > 0 or is_active_now:
             unique_days_all.add(log_date.date())
 
-        # Add to Today
+        # Add to Today (Compare IST Dates)
         if log_date >= start_of_day:
             stats["today"]["hours"] += duration
             if is_active_now:
@@ -134,8 +136,9 @@ async def calculate_productivity(db, student_id: str):
     stats["month"]["days_present"] = len(unique_days_month)
     stats["all_time"]["total_days"] = len(unique_days_all)
 
-    # Rounding for cleanliness
+    # Rounding
     stats["all_time"]["total_hours"] = round(stats["all_time"]["total_hours"], 2)
+    stats["lifetime"]["hours"] = round(stats["lifetime"]["hours"], 2)
     stats["week"]["hours"] = round(stats["week"]["hours"], 2)
     stats["month"]["hours"] = round(stats["month"]["hours"], 2)
     stats["today"]["hours"] = round(stats["today"]["hours"], 2)
@@ -149,7 +152,18 @@ async def calculate_productivity(db, student_id: str):
 # 1. FOR STUDENT: My Performance
 @router.get("/my-performance")
 async def get_my_performance(current_user: dict = Depends(get_current_user)):
+    # ✅ FIX: Agar Admin login hai, to Crash mat hone do. Empty stats return karo.
+    if current_user.get("role") == "admin":
+        return {
+            "today": {"hours": 0, "status": "Admin View"},
+            "week": {"hours": 0, "days_present": 0},
+            "month": {"hours": 0, "days_present": 0},
+            "all_time": {"total_hours": 0, "total_days": 0},
+            "lifetime": {"hours": 0, "sessions": 0}
+        }
+
     db = get_database()
+    # Ab ye line tabhi chalegi jab Student hoga (jiske paas _id hai)
     stats = await calculate_productivity(db, str(current_user["_id"]))
     return stats
 
