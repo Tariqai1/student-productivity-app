@@ -7,6 +7,7 @@ from app.core.config import settings
 async def send_email(email_to: str, subject: str, html_content: str):
     """
     Generic function to send emails using SMTP_SSL (Gmail Port 465).
+    This is required for Render/Cloud servers.
     """
     try:
         # 1. Setup Message
@@ -22,8 +23,9 @@ async def send_email(email_to: str, subject: str, html_content: str):
         # 3. Create Secure SSL Context
         context = ssl.create_default_context()
 
-        # 4. Connect to Server & Send (Using SMTP_SSL for Port 465)
-        # 👇 CHANGE: SMTP_SSL use kar rahe hain jo seedha connect hota hai
+        # 4. Connect to Server & Send
+        # 👇 CHANGE: Use SMTP_SSL instead of SMTP
+        # 👇 CHANGE: Remove server.starttls() (Not needed for SSL)
         with smtplib.SMTP_SSL(settings.EMAIL_HOST, settings.EMAIL_PORT, context=context) as server:
             server.login(settings.EMAIL_SENDER, settings.EMAIL_PASSWORD)
             server.sendmail(
@@ -44,8 +46,9 @@ async def send_reset_password_email(email_to: str, token: str):
     """
     Sends the specific 'Reset Password' email with the link.
     """
-    # 🔗 Frontend Reset Link (Make sure this matches your deployed domain)
-    # Testing ke liye localhost, Production ke liye Vercel link use karein
+    # 🔗 Frontend Reset Link
+    # IMPORTANT: When deploying to Render, change localhost to your Vercel URL
+    # Example: https://your-app.vercel.app/reset-password?token={token}
     reset_link = f"https://student-productivity-app-brown.vercel.app/reset-password?token={token}"
 
     subject = "Reset Your Password - StudentApp"
