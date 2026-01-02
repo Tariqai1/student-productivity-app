@@ -26,16 +26,18 @@ class Settings(BaseSettings):
     # ===============================
     # WIFI SECURITY 📶
     # ===============================
-    # Allowed Wi-Fi Names (Case Sensitive)
     ALLOWED_WIFI_SSID: List[str] = ["TECHSKILLS", "TECHSKILLS_5G"]
 
     # ===============================
     # EMAIL CONFIGURATION 📧
     # ===============================
     EMAIL_HOST: str = "smtp.gmail.com"
-    EMAIL_PORT: int = 587
+    
+    # 👇 CHANGE HERE: Use Port 465 for SSL (Fixes Render Issue)
+    EMAIL_PORT: int = 465 
+    
     EMAIL_SENDER: str = "itsoft404@gmail.com"
-    # Note: Yeh Google App Password hai (Secure)
+    # Note: Ensure this is a Google App Password, not your login password
     EMAIL_PASSWORD: str = "fagbpflegfwegswk"
 
     class Config:
