@@ -91,18 +91,17 @@ async def register(student: StudentRegister):
     return {"message": "Student registered successfully"}
 
 # ==========================================
-3. FORGOT PASSWORD (Link Based)
+# 3. FORGOT PASSWORD (Link Based)  <-- ✅ FIX: Hash (#) added here
 # ==========================================
 @router.post("/forgot-password")
 async def forgot_password(request: ForgotPasswordRequest): 
-    # ⚠️ Maine 'BackgroundTasks' hata diya hai taaki hum wait karein result ka
+    # ⚠️ BackgroundTasks hata diya gaya hai for debugging
     
     db = get_database()
     user = await db["students"].find_one({"email": request.email})
     
     if not user:
-        # Security: Fake success message taaki hacker ko pata na chale email exist karta hai ya nahi
-        # Lekin development mein aap isse comment out karke check kar sakte hain
+        # Security reason se same message return karte hain
         return {"message": "If this email is registered, you will receive a reset link."}
 
     token = str(uuid.uuid4())
@@ -116,15 +115,14 @@ async def forgot_password(request: ForgotPasswordRequest):
     
     await db["password_resets"].insert_one(reset_entry)
     
-    # ✅ FIX: Ab hum 'await' kar rahe hain. 
-    # Agar email fail hua, to ye function False return karega.
+    # ✅ FIX: 'await' kar rahe hain result ka
     email_sent = await send_reset_password_email(request.email, token)
     
     if not email_sent:
-        # Ab Frontend par Red Error aayega agar email nahi gaya
         raise HTTPException(status_code=500, detail="Failed to send email. Check Server Logs.")
     
     return {"message": "Password reset link sent to your email."}
+
 # ==========================================
 # 4. RESET PASSWORD
 # ==========================================
@@ -157,7 +155,6 @@ async def reset_password(request: ResetPasswordRequest):
 async def fix_old_users():
     """Fixes users who don't have a hashed_password field."""
     db = get_database()
-    # Find users missing hashed_password
     broken_users = await db["students"].find({"hashed_password": {"$exists": False}}).to_list(100)
     
     if not broken_users:
@@ -167,7 +164,6 @@ async def fix_old_users():
     default_pass = get_password_hash("123456")
     
     for user in broken_users:
-        # If they have old plain 'password', hash it
         if "password" in user:
             new_hash = get_password_hash(user["password"])
             await db["students"].update_one(
@@ -175,7 +171,6 @@ async def fix_old_users():
                 {"$set": {"hashed_password": new_hash}, "$unset": {"password": ""}}
             )
         else:
-            # Else set default
             await db["students"].update_one(
                 {"_id": user["_id"]},
                 {"$set": {"hashed_password": default_pass}}
@@ -208,7 +203,6 @@ async def migrate_old_data():
     """
     db = get_database()
     
-    # 1. Fetch old activities
     old_activities = await db["activities"].find({}).to_list(length=2000)
     count = 0
     
@@ -221,8 +215,7 @@ async def migrate_old_data():
             
         student_id = str(student["_id"])
         
-        # 2. Parse Dates logic
-        date_str = act.get("date")  # "2025-06-27"
+        date_str = act.get("date")
         time_in_str = act.get("check_in")
         
         final_check_in = datetime.utcnow()
@@ -232,7 +225,6 @@ async def migrate_old_data():
             if date_str and time_in_str:
                 dt_str = f"{date_str} {time_in_str.split('.')[0]}"
                 final_check_in = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
-                # Assume 1 hour duration if checkout missing or just set same time
                 final_check_out = final_check_in + timedelta(hours=1)
                 
             if act.get("check_out"):
@@ -243,7 +235,6 @@ async def migrate_old_data():
             if act.get("recorded_at"):
                 final_check_in = act.get("recorded_at")
 
-        # 3. Insert if not duplicate
         exists = await db["attendance"].find_one({
             "student_id": student_id,
             "tasks": act.get("task_description")
