@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     EMAIL_API_KEY: str = "xkeysib-YOUR_KEY_HERE_IF_LOCAL" 
     
     # Sender Email (Jo Brevo me account banate waqt use kiya tha)
-    EMAIL_SENDER: str = "tarique272192@gmail.com" 
+    EMAIL_SENDER: str = "itsoft404@gmail.com" 
     
     TIMEZONE: str = "Asia/Kolkata"
 
